@@ -2,9 +2,8 @@
 import argparse
 import xarray as xr
 import numpy as np
+import pyinterp
 from scipy import interpolate
-
-
 
 
 
@@ -17,10 +16,19 @@ def read_netcdf_files(file1, file2, file3):
         file1 (str): Path to the first NetCDF file (Model).
         file2 (str): Path to the second NetCDF file (Mask for model).
         file3 (str): Path to the third NetCDF file (SWOT data).
+        - interpolator (str) : the used interpolator
         
     Returns:
         tuple: A tuple containing three xarray datasets.
     """
+    interpolator = input(f"Enter the interpolator you wish to use, choose 'scipy_interpolator' or 'pyinterp_interpolator' : " )
+    
+    if interpolator == 'scipy_interpolator' or interpolator == 'pyinterp_interpolator':
+        print("Interpolation in progress ...")
+    else:    
+        sys.exit("Invalid choice! Please choose either 'scipy_interpolator' or 'pyinterp_interpolator'.")
+
+    
     ds1 = xr.open_dataset(file1)# model
     ds2 = xr.open_dataset(file2) #mask model
     ds3 = xr.open_dataset(file3) #swot
@@ -28,15 +36,13 @@ def read_netcdf_files(file1, file2, file3):
     ds1["ssh"] = ds1["sossheig"].isel(time_counter=0)
     del ds1["sossheig"]
     
-    ds3["ssh"] = ds3["ssha"]  + ds3["mdt"] 
+    # ds3["ssh"] = ds3["ssha"]  + ds3["mdt"] 
     
-    return ds1, ds2, ds3
+    return ds1, ds2, ds3 , interpolator
 
 
 
-
-
-def open_model_data(ds_var, ds_coords, var, lat_name="latitude", lon_name="longitude"):
+def open_model_data(ds_var, ds_coords, var,interpolator, lat_name="latitude", lon_name="longitude"):
     """
     Creates an interpolator from a model dataset containing the ssh variable.
     The spatial coordinates (latitude and longitude) are provided as 2D variables in a separate dataset.
@@ -47,11 +53,13 @@ def open_model_data(ds_var, ds_coords, var, lat_name="latitude", lon_name="longi
     - var (str): Name of the variable to interpolate.
     - lat_name (str, optional): Name of the latitude variable in ds_coords (default: "latitude").
     - lon_name (str, optional): Name of the longitude variable in ds_coords (default: "longitude").
+    - interpolator (str) : the used interpolator
+    
 
     Returns:
     - finterp (LinearNDInterpolator): Interpolator for irregular 2D (latitude, longitude) grid.
     """
-
+        
     # Check if the variable exists in ds_var
     if var not in ds_var:
         raise ValueError(f"Variable '{var}' is not present in the provided dataset.")
@@ -69,32 +77,49 @@ def open_model_data(ds_var, ds_coords, var, lat_name="latitude", lon_name="longi
     # Ensure the variable has the correct dimensions (latitude, longitude)
     if var_values.ndim == 3:  # If an extra time dimension exists
         var_values = var_values[0]  # Take only the first time step
+    
+    if interpolator == "scipy_interpolator":
+        # Flatten the 2D grid into 1D arrays
+        lat_flat = lat_values.flatten()
+        lon_flat = lon_values.flatten()
+        var_flat = var_values.flatten()
 
-    # Flatten the 2D grid into 1D arrays
-    lat_flat = lat_values.flatten()
-    lon_flat = lon_values.flatten()
-    var_flat = var_values.flatten()
+        # Create a scattered data interpolator  !!!!!!! car c'est irregular 2D grids)
+        finterp = interpolate.LinearNDInterpolator(
+            list(zip(lat_flat, lon_flat)),  
+            var_flat,  
+            fill_value=np.nan  
+        )
 
-    # Create a scattered data interpolator  !!!!!!! car c'est irregular 2D grids)
-    finterp = interpolate.LinearNDInterpolator(
-        list(zip(lat_flat, lon_flat)),  
-        var_flat,  
-        fill_value=np.nan  
-    )
+    elif interpolator == "pyinterp_interpolator":
+        # Flatten  the 2D grid into 1D arrays and mask invalid points
+        mask = np.isfinite(var_values)*np.isfinite(lon_values)*np.isfinite(lat_values)
+            
+        lon_flat = lon_values[mask]
+        lat_flat = lat_values[mask]
+        var_flat = var_values[mask]
+    
+        #  Create an interpolator
+        points = np.vstack((lon_flat, lat_flat)).T
+        finterp = pyinterp.RTree()
+        finterp.packing(points,var_flat)
+
+    
 
     return finterp
 
 
 
-def interp_satellite(latitude_array, longitude_array, interp, var):
+def interp_satellite(latitude_array, longitude_array, interp, interpolator, var):
     """
     Interpolates the modeled SSH at satellite observation points (wide swath only).
 
     Parameters:
     - latitude_array (xarray.DataArray or np.array): Latitude of each satellite pixel (shape = [num_lines, num_pixels])
     - longitude_array (xarray.DataArray or np.array): Longitude of each satellite pixel (shape = [num_lines, num_pixels])
-    - interp (scipy.interpolate.LinearNDInterpolator): Interpolator from `open_model_data`
-    - var (str): Name of the ssh variable (e.g., "ssh_debug")
+    - interp (scipy.interpolate.LinearNDInterpolator): Interpolator from `open_model_data` 
+    - interpolator (str) : the used interpolator
+     - var (str): Name of the ssh variable (e.g., "ssh_debug")
 
     Returns:
     - ds (xarray.Dataset): Dataset of interpolated SSH values, structured for wide swath data.
@@ -108,8 +133,16 @@ def interp_satellite(latitude_array, longitude_array, interp, var):
     points = np.column_stack((latitude_array.flatten(), longitude_array.flatten()))
 
     # Apply the interpolator to get SSH values at satellite positions
-    ssh_interp = interp(points).reshape(latitude_array.shape)
-
+    if interpolator == "scipy_interpolator":
+        ssh_interp = interp(points).reshape(latitude_array.shape)
+        
+    elif interpolator == "pyinterp_interpolator":
+        ssh_interp = interp.inverse_distance_weighting(
+            points,
+            k=4,
+            p=2
+            )[0].reshape(latitude_array.shape)
+    
     # Rename variable if needed
     if var != "ssh":
         var = "ssh"
@@ -143,15 +176,13 @@ def main():
     args = parser.parse_args()
 
     # read files NetCDF
-    ds_model, ds_mask, ds_swot = read_netcdf_files(args.file1, args.file2, args.file3)
+    ds_model, ds_mask, ds_swot, interpolator = read_netcdf_files(args.file1, args.file2, args.file3)
     # Analyse
-    finterp = open_model_data(ds_model, ds_mask, "ssh","nav_lat","nav_lon")
-    output_ds = interp_satellite(ds_swot.latitude, ds_swot.longitude, finterp, var="ssh")
+    finterp  = open_model_data(ds_model, ds_mask, "ssh", interpolator, "nav_lat","nav_lon")
+    output_ds = interp_satellite(ds_swot.latitude, ds_swot.longitude, finterp,interpolator, var="ssh")
     
     # Sauvegarder le fichier
     save_netcdf(output_ds, args.output)
 
 if __name__ == "__main__":
     main()
-
- 
