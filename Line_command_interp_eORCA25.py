@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import argparse
 import xarray as xr
 import numpy as np
@@ -21,24 +22,56 @@ def read_netcdf_files(file1, file2, file3):
     Returns:
         tuple: A tuple containing three xarray datasets.
     """
+    
+    variable_name = input(f"Enter the variable to be interpolated name : " )
+    
+    latlon_input = input("Enter dimension names separated by a comma (time, lat, lon): ").strip()
+    
+    try:
+        time_name, lat_name, lon_name = [name.strip() for name in latlon_input.split(",")]
+       
+        
+    except ValueError:
+        sys.exit("Please enter exactly three dimension names separated by a comma:")
+        
+    
     interpolator = input(f"Enter the interpolator you wish to use, choose 'scipy_interpolator' or 'pyinterp_interpolator' : " )
     
-    if interpolator == 'scipy_interpolator' or interpolator == 'pyinterp_interpolator':
-        print("Interpolation in progress ...")
-    else:    
-        sys.exit("Invalid choice! Please choose either 'scipy_interpolator' or 'pyinterp_interpolator'.")
+    if interpolator in ('scipy_interpolator', 'pyinterp_interpolator'):
+        pass
+    else:
+        sys.exit("Invalid interpolator! Please choose either 'scipy_interpolator' or 'pyinterp_interpolator'.")
 
     
-    ds1 = xr.open_dataset(file1)# model
-    ds2 = xr.open_dataset(file2) #mask model
-    ds3 = xr.open_dataset(file3) #swot
+    extension1 = os.path.splitext(file1)[1]
+    extension2 = os.path.splitext(file2)[1]
+    extension3 = os.path.splitext(file3)[1]
     
-    ds1["ssh"] = ds1["sossheig"].isel(time_counter=0)
-    del ds1["sossheig"]
+    # Open datasets depending on format
+    ds1 = xr.open_dataset(file1) if extension1 == ".nc" else xr.open_zarr(file1) # model
+    
+    if file1 == file2:
+        ds2 = ds1         # save memory 
+    else:
+        ds2 = xr.open_dataset(file2) if extension2 == ".nc" else xr.open_zarr(file2) #mask model
+    ds3 = xr.open_dataset(file3) if extension3 == ".nc" else xr.open_zarr(file3) #swot
+    
+    
+    
+    if variable_name not in ds1:
+        sys.exit(f"Variable '{variable_name}' not found in the model dataset.")
+    
+    ds1["ssh"] = ds1[variable_name]
+    
+    if len(ds1[variable_name].dims)==3:
+        ds1 = ds1.isel({time_name: 0}) #(pourquoi prendre uniquement un seul pas de temps, il faudra généraliser pour la dimension temps)
+        
+    if variable_name!="ssh":
+        del ds1[variable_name]
     
     # ds3["ssh"] = ds3["ssha"]  + ds3["mdt"] 
     
-    return ds1, ds2, ds3 , interpolator
+    return ds1, ds2, ds3 , interpolator, lat_name, lon_name
 
 
 
@@ -59,14 +92,15 @@ def open_model_data(ds_var, ds_coords, var,interpolator, lat_name="latitude", lo
     Returns:
     - finterp (LinearNDInterpolator): Interpolator for irregular 2D (latitude, longitude) grid.
     """
-        
+    
+    
     # Check if the variable exists in ds_var
     if var not in ds_var:
         raise ValueError(f"Variable '{var}' is not present in the provided dataset.")
 
     # Extract latitude and longitude from ds_coords (as 2D arrays)
     try:
-        lat_values = ds_coords[lat_name].values  # Shape (x, y)
+        lat_values = ds_coords[lat_name].values  # Shape (x, y)          # si ds_coords en dask array il y a un soucis de memoire. comment faire???
         lon_values = ds_coords[lon_name].values  # Shape: x, y)
     except KeyError:
         raise ValueError(f"Could not find '{lat_name}' or '{lon_name}' in the coordinates dataset.")
@@ -78,11 +112,13 @@ def open_model_data(ds_var, ds_coords, var,interpolator, lat_name="latitude", lo
     if var_values.ndim == 3:  # If an extra time dimension exists
         var_values = var_values[0]  # Take only the first time step
     
+    mask = np.isfinite(var_values)*np.isfinite(lon_values)*np.isfinite(lat_values)
+    
     if interpolator == "scipy_interpolator":
         # Flatten the 2D grid into 1D arrays
-        lat_flat = lat_values.flatten()
-        lon_flat = lon_values.flatten()
-        var_flat = var_values.flatten()
+        lat_flat = lat_values[mask]
+        lon_flat = lon_values[mask]
+        var_flat = var_values[mask]
 
         # Create a scattered data interpolator  !!!!!!! car c'est irregular 2D grids)
         finterp = interpolate.LinearNDInterpolator(
@@ -92,9 +128,7 @@ def open_model_data(ds_var, ds_coords, var,interpolator, lat_name="latitude", lo
         )
 
     elif interpolator == "pyinterp_interpolator":
-        # Flatten  the 2D grid into 1D arrays and mask invalid points
-        mask = np.isfinite(var_values)*np.isfinite(lon_values)*np.isfinite(lat_values)
-            
+        # Flatten  the 2D grid into 1D arrays and mask invalid points            
         lon_flat = lon_values[mask]
         lat_flat = lat_values[mask]
         var_flat = var_values[mask]
@@ -102,9 +136,7 @@ def open_model_data(ds_var, ds_coords, var,interpolator, lat_name="latitude", lo
         #  Create an interpolator
         points = np.vstack((lon_flat, lat_flat)).T
         finterp = pyinterp.RTree()
-        finterp.packing(points,var_flat)
-
-    
+        finterp.packing(points,var_flat)   
 
     return finterp
 
@@ -133,15 +165,17 @@ def interp_satellite(latitude_array, longitude_array, interp, interpolator, var)
     points = np.column_stack((latitude_array.flatten(), longitude_array.flatten()))
 
     # Apply the interpolator to get SSH values at satellite positions
+    
     if interpolator == "scipy_interpolator":
+        print("Interpolation in progress ...")
         ssh_interp = interp(points).reshape(latitude_array.shape)
-        
+        print('interplation done')
     elif interpolator == "pyinterp_interpolator":
         ssh_interp = interp.inverse_distance_weighting(
             points,
             k=4,
             p=2
-            )[0].reshape(latitude_array.shape)
+            )[0].reshape(latitude_array.shape)   # parameter K and p might be adjusted! 
     
     # Rename variable if needed
     if var != "ssh":
@@ -176,9 +210,11 @@ def main():
     args = parser.parse_args()
 
     # read files NetCDF
-    ds_model, ds_mask, ds_swot, interpolator = read_netcdf_files(args.file1, args.file2, args.file3)
+    ds_model, ds_mask, ds_swot, interpolator, lat_name, lon_name = read_netcdf_files(args.file1, args.file2, args.file3)
+    print("All dataset are opened ...")
     # Analyse
-    finterp  = open_model_data(ds_model, ds_mask, "ssh", interpolator, "nav_lat","nav_lon")
+    finterp  = open_model_data(ds_model, ds_mask, "ssh", interpolator, lat_name, lon_name)
+   
     output_ds = interp_satellite(ds_swot.latitude, ds_swot.longitude, finterp,interpolator, var="ssh")
     
     # Sauvegarder le fichier
