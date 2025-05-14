@@ -2,11 +2,8 @@
 import argparse
 import xarray as xr
 import numpy as np
+import pyinterp
 from scipy import interpolate
-
-
-
-
 
 
 def read_netcdf_files(file1, file2, file3):
@@ -36,7 +33,7 @@ def read_netcdf_files(file1, file2, file3):
 
 
 
-def open_model_data(ds_var, ds_coords, var, lat_name="latitude", lon_name="longitude"):
+def open_model_data(ds_var, ds_coords,interpolator, var, lat_name="latitude", lon_name="longitude"):
     """
     Creates an interpolator from a model dataset containing the ssh variable.
     The spatial coordinates (latitude and longitude) are provided as 2D variables in a separate dataset.
@@ -76,17 +73,28 @@ def open_model_data(ds_var, ds_coords, var, lat_name="latitude", lon_name="longi
     var_flat = var_values.flatten()
 
     # Create a scattered data interpolator  !!!!!!! car c'est irregular 2D grids)
-    finterp = interpolate.LinearNDInterpolator(
-        list(zip(lat_flat, lon_flat)),  
-        var_flat,  
-        fill_value=np.nan  
-    )
+    if interpolator == "scipy_interpolator":
+       
+        finterp = interpolate.LinearNDInterpolator(
+            list(zip(lat_flat, lon_flat)),
+            var_flat,
+            fill_value=np.nan
+        )
+        
+    elif interpolator == "pyinterp_interpolator":
+
+        points = np.column_stack((lon_flat, lat_flat))
+        finterp = pyinterp.RTree()
+        finterp.packing(points, var_flat)
+    else:
+        raise ValueError(f"Unknown interpolator: {interpolator}")
+    
 
     return finterp
 
 
 
-def interp_satellite(latitude_array, longitude_array, interp, var):
+def interp_satellite(latitude_array, longitude_array,interpolator, interp, var):
     """
     Interpolates the modeled SSH at satellite observation points (wide swath only).
 
@@ -108,8 +116,24 @@ def interp_satellite(latitude_array, longitude_array, interp, var):
     points = np.column_stack((latitude_array.flatten(), longitude_array.flatten()))
 
     # Apply the interpolator to get SSH values at satellite positions
-    ssh_interp = interp(points).reshape(latitude_array.shape)
-
+    
+    print("Interpolation in progress ...")
+    
+    if interpolator == "scipy_interpolator":
+        # Flatten the satellite lat/lon arrays to feed into the interpolator
+        points = np.column_stack((latitude_array.flatten(), longitude_array.flatten()))       
+        ssh_interp = interp(points).reshape(latitude_array.shape)
+         
+    elif interpolator == "pyinterp_interpolator":
+        points = np.column_stack((longitude_array.flatten(), latitude_array.flatten()))
+        ssh_interp = interp.inverse_distance_weighting(
+            coordinates=points,                                  
+            k=4,    # We are looking for at most ' neighbours
+            num_threads=0, # parallel computing                         
+            p=2,  #The power to be used by the interpolator inverse_distance_weighting.
+            within=True
+            )[0].reshape(latitude_array.shape) 
+               
     # Rename variable if needed
     if var != "ssh":
         var = "ssh"
@@ -139,14 +163,16 @@ def main():
     parser.add_argument("file2", help="Path of the mask NetCDF file")
     parser.add_argument("file3", help="Path of the SWOT NetCDF file")
     parser.add_argument("output", help="Path of the output nc file")
+    parser.add_argument("interpolator", help="The interpolation method used")   # To be mentioned to the README file
 
     args = parser.parse_args()
 
     # read files NetCDF
+    interpolator = args.interpolator
     ds_model, ds_mask, ds_swot = read_netcdf_files(args.file1, args.file2, args.file3)
     # Analyse
-    finterp = open_model_data(ds_model, ds_mask, "ssh","nav_lat","nav_lon")
-    output_ds = interp_satellite(ds_swot.latitude, ds_swot.longitude, finterp, var="ssh")
+    finterp = open_model_data(ds_model, ds_mask,interpolator, "ssh","nav_lat","nav_lon")
+    output_ds = interp_satellite(ds_swot.latitude, ds_swot.longitude,interpolator, finterp, var="ssh")
     
     # Sauvegarder le fichier
     save_netcdf(output_ds, args.output)
