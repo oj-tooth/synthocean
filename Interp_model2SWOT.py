@@ -4,8 +4,7 @@ import xarray as xr
 import numpy as np
 import pyinterp
 from scipy import interpolate
-
-
+ 
 def read_netcdf_files(file1, file2, file3):
     """
     Reads three NetCDF files and returns the datasets.
@@ -19,17 +18,15 @@ def read_netcdf_files(file1, file2, file3):
         tuple: A tuple containing three xarray datasets.
     """
     ds1 = xr.open_dataset(file1)# model
-    ds2 = xr.open_dataset(file2) #mask model
+    ds2 = xr.open_dataset(file2) #mask model    
     ds3 = xr.open_dataset(file3) #swot
     
     ds1["ssh"] = ds1["sossheig"].isel(time_counter=0)
     del ds1["sossheig"]
     
     ds3["ssh"] = ds3["ssha"]  + ds3["mdt"] 
-    
+     
     return ds1, ds2, ds3
-
-
 
 
 
@@ -94,7 +91,7 @@ def open_model_data(ds_var, ds_coords,interpolator, var, lat_name="latitude", lo
 
 
 
-def interp_satellite(latitude_array, longitude_array,interpolator, interp, var):
+def interp_satellite(latitude_array, longitude_array, ssh_swot,interpolator, interp, var):
     """
     Interpolates the modeled SSH at satellite observation points (wide swath only).
 
@@ -109,6 +106,8 @@ def interp_satellite(latitude_array, longitude_array,interpolator, interp, var):
     """
 
     # Ensure latitude and longitude are NumPy arrays before flattening
+    longitude_array = xr.where(longitude_array>180 , longitude_array-360, longitude_array)  # swot longitude conversion from 0/360 to 180/-180
+    
     latitude_array = np.asarray(latitude_array)
     longitude_array = np.asarray(longitude_array)
 
@@ -146,7 +145,10 @@ def interp_satellite(latitude_array, longitude_array,interpolator, interp, var):
         "longitude": (["num_lines", "num_pixels"], longitude_array)
     })
 
-    ds["ssh"] = ds["ssh"].where(ds["ssh"] != 0.0, np.nan)
+    
+    ds["ssh"] = ds["ssh"].where(~np.isnan(ssh_swot)) # removing data from where swot does not have any (inter-swath and periphery areas)
+    
+    ds.coords['longitude']= xr.where(ds.longitude<0 , ds.longitude+360, ds.longitude)  # swot longitude conversion back to 0/360
     
     return ds
 
@@ -172,7 +174,7 @@ def main():
     ds_model, ds_mask, ds_swot = read_netcdf_files(args.file1, args.file2, args.file3)
     # Analyse
     finterp = open_model_data(ds_model, ds_mask,interpolator, "ssh","nav_lat","nav_lon")
-    output_ds = interp_satellite(ds_swot.latitude, ds_swot.longitude,interpolator, finterp, var="ssh")
+    output_ds = interp_satellite(ds_swot.latitude, ds_swot.longitude,ds_swot.ssha, interpolator, finterp, var="ssh")
     
     # Sauvegarder le fichier
     save_netcdf(output_ds, args.output)
