@@ -6,7 +6,7 @@ import pyinterp
 import os
 from scipy import interpolate
 from inpoly.inpoly2 import inpoly2
-import matplotlib.pyplot as plt
+
 
 
 def read_netcdf_files(file1, file2, file3):
@@ -89,32 +89,7 @@ def select_area(lat, lon, var, latitude_array, longitude_array):
         Y.isel(num_pixels=0).values[::-1]+k1
     ])
     
-    # Optional: original swath edge (for plotting only)
     
-    xx1 = np.concatenate([
-        X.isel(num_lines=0).values,
-        X.isel(num_pixels=-1).values,
-        X.isel(num_lines=-1).values[::-1],
-        X.isel(num_pixels=0).values[::-1]
-    ])
-
-    yy1 = np.concatenate([
-        Y.isel(num_lines=0).values,
-        Y.isel(num_pixels=-1).values,
-        Y.isel(num_lines=-1).values[::-1],
-        Y.isel(num_pixels=0).values[::-1]
-    ])
-    
-    # Visualization (optional)
-    plt.figure(figsize=(6, 6))
-    plt.plot(xx, yy, label="Polygon with margin")
-    plt.plot(xx1, yy1, label="Swath edge", linestyle='--')
-    plt.legend()
-    plt.title("Selected Area")
-    plt.xlabel("Longitude")
-    plt.ylabel("Latitude")
-    plt.grid(True)
-    plt.tight_layout()
     
     
     polygon = np.column_stack((xx, yy))  
