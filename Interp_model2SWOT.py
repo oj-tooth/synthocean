@@ -250,25 +250,58 @@ def save_netcdf(result, output_file):
     """
     result.to_netcdf(output_file)
 
-def main():
-    parser = argparse.ArgumentParser(description="Processing workflow")
-    parser.add_argument("file1", help="Path of the model NetCDF file")
-    parser.add_argument("file2", help="Path of the mask NetCDF file")
-    parser.add_argument("file3", help="Path of the SWOT NetCDF file")
-    parser.add_argument("output", help="Path of the output nc file")
-    parser.add_argument("interpolator", help="The interpolation method used")   # To be mentioned to the README file
 
+ALLOWED_INTERPOLATORS = ['scipy_interpolator', 'pyinterp_interpolator']
+
+def validate_interpolator(value):
+    """function to validate the interpolator argument."""
+    if value.lower() not in ALLOWED_INTERPOLATORS:
+        raise argparse.ArgumentTypeError(
+            f"Invalid interpolator method: '{value}'. "
+            f"Allowed methods are: {', '.join(ALLOWED_INTERPOLATORS)}"
+        )
+    return value.lower() 
+
+
+def main():
+    parser = argparse.ArgumentParser(description="A tool to process and interpolate ocean model to SWOT satellite swath",
+        formatter_class=argparse.RawTextHelpFormatter # for multiline help messages
+                                    )
+    parser.add_argument("-m", "--model_file", required=True, help="Path of the input model file (NETCDF or zarr)")
+    parser.add_argument("-k", "--mask_file", required=True, help="Path of the input mask file (NETCDF or zarr)")
+    parser.add_argument("-s", "--swot_file", required=True, help="Path of the input SWOT file (NETCDF or zarr)")
+    parser.add_argument("-o", "--output_file", required=True, help="Path of the output NETCDF file")
+    parser.add_argument("-i", "--interpolator", type=validate_interpolator, required=True,
+                        help=f"The interpolation method to use. "
+                             f"Supported methods are: {', '.join(ALLOWED_INTERPOLATORS)}.\n"
+                             f"Choose one from the list based on your needs.")
+    # Arguments for model's lat/lon variable names
+    parser.add_argument("--model-lat-var", default="latitude",
+                        help="Name of the latitude variable in the model NetCDF file (default: latitude).")
+    parser.add_argument("--model-lon-var", default="longitude",
+                        help="Name of the longitude variable in the model NetCDF file (default: longitude).")
+
+    
     args = parser.parse_args()
 
-    # read files NetCDF
+    # Pre-check existence of input files
+    for f in [args.model_file, args.mask_file, args.swot_file]:
+        if not os.path.exists(f):
+            parser.error(f"Error: Input file not found: {f}")
+        if not os.path.isfile(f):
+            parser.error(f"Error: Path is not a file: {f}")
+
+    # read files
     interpolator = args.interpolator
-    ds_model, ds_mask, ds_swot = read_netcdf_files(args.file1, args.file2, args.file3)
+    print(f"Processing with interpolator: {interpolator}")
+    ds_model, ds_mask, ds_swot = read_netcdf_files(args.model_file, args.mask_file, args.swot_file)
     # Analyse
-    finterp = open_model_data(ds_model, ds_mask,interpolator, "ssh", ds_swot.latitude, ds_swot.longitude, "nav_lat","nav_lon")
+    finterp = open_model_data(ds_model, ds_mask,interpolator, "ssh", ds_swot.latitude, ds_swot.longitude, args.model_lat_var, args.model_lon_var)
     output_ds = interp_satellite(ds_swot.latitude, ds_swot.longitude, ds_swot.cross_track_distance, interpolator, finterp, var="ssh")
     
     # Sauvegarder le fichier
-    save_netcdf(output_ds, args.output)
+    save_netcdf(output_ds, args.output_file)
+    print("Script finished successfully")
 
 if __name__ == "__main__":
     main()
