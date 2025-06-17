@@ -179,7 +179,7 @@ def open_model_data(ds_var, ds_coords,interpolator, var, latitude_array, longitu
 
 
 
-def interp_satellite(latitude_array, longitude_array,cross_dist,interpolator, interp, var):
+def interp_satellite(latitude_array, longitude_array,cross_dist,quality_flag, interpolator, interp, var):
     """
     Interpolates the modeled SSH at satellite observation points (wide swath only).
 
@@ -188,6 +188,7 @@ def interp_satellite(latitude_array, longitude_array,cross_dist,interpolator, in
     - longitude_array (xarray.DataArray or np.array): Longitude of each satellite pixel (shape = [num_lines, num_pixels])
     - interp (scipy.interpolate.LinearNDInterpolator): Interpolator from `open_model_data`
     - var (str): Name of the ssh variable (e.g., "ssh_debug")
+    - cross_dist and quality_flag are used to build the mask
 
     Returns:
     - ds (xarray.Dataset): Dataset of interpolated SSH values, structured for wide swath data.
@@ -234,9 +235,9 @@ def interp_satellite(latitude_array, longitude_array,cross_dist,interpolator, in
     })
     
     
-    # removing data from where swot does not have any (inter-swath and periphery areas)
-    # Only values between 10 to 60 km to the nadir are considered as valid data. https://www.aviso.altimetry.fr/fileadmin/documents/data/tools/hdbk_duacs_SWOT_L3.pdf                     
-    mask = xr.where((abs(cross_dist)<=60.0) & (abs(cross_dist)>=10.0),cross_dist,np.nan)                                                                                
+    # removing data from where swot does not have any (inter-swath and periphery areas) and from the continent (eventually) [see quality flag in the documentation]
+    # Only values between 10 and 60 km to the nadir are considered as valid data. https://www.aviso.altimetry.fr/fileadmin/documents/data/tools/hdbk_duacs_SWOT_L3.pdf                                                                                               
+    mask = xr.where((abs(cross_dist)<=60.0) & (abs(cross_dist)>=10.0) & (quality_flag<101) ,cross_dist,np.nan)                                                                             
     ds["ssh"] = ds["ssh"].where(~np.isnan(mask))
     
     # swot longitude conversion back to 0/360
@@ -297,7 +298,7 @@ def main():
     ds_model, ds_mask, ds_swot = read_netcdf_files(args.model_file, args.mask_file, args.swot_file)
     # Analyse
     finterp = open_model_data(ds_model, ds_mask,interpolator, "ssh", ds_swot.latitude, ds_swot.longitude, args.model_lat_var, args.model_lon_var)
-    output_ds = interp_satellite(ds_swot.latitude, ds_swot.longitude, ds_swot.cross_track_distance, interpolator, finterp, var="ssh")
+    output_ds = interp_satellite(ds_swot.latitude, ds_swot.longitude, ds_swot.cross_track_distance, ds_swot.quality_flag, interpolator, finterp, var="ssh")
     
     # Sauvegarder le fichier
     save_netcdf(output_ds, args.output_file)
