@@ -5,7 +5,7 @@
 The file `Interp_model2SWOT.py` contains the code to execute the command line from your terminal using the following command:
 
 ```bash
-./Interp_model2SWOT.py -m path_to_your_model_file -k path_to_your_model_mask_file -s path_to_swot_data_file -o path_to_output_file -i scipy_interpolater --model-lat-var latitude_var_name --model-lon-var longitude_var_name
+./Interp_model2SWOT.py -m path_to_your_model_file -k path_to_your_model_mask_file -s path_to_swot_data_file -o path_to_output_file -i interpolator --model-lat-var latitude_var_name --model-lon-var longitude_var_name
 ```
 
 ## ⚡ Notes
