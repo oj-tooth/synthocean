@@ -4,14 +4,12 @@
 
 Description:
 
-Interp_model2SWOT is an approach designed to interpolate model SSH (sea surface height) data onto the SWOT (Surface Water and Ocean Topography) grid. Given a single daiy model SSH data, the script interpolates the SSH data onto a given SWOT swath.
+Interp_model2SWOT is an approach designed to interpolate model SSH (Sea Surface Height) data onto the SWOT (Surface Water and Ocean Topography) grid. Given a single daily model data, the script interpolates the SSH data onto a given SWOT swath.
 
 Main Requered Inputs:
 
 - model files containing SSH data.
 - Model mask containing the longitude and latitude coordinates.
-
-
 - SWOT data file containing the target longitude/latitude grid. It is recommended to use the "Expert" version of these files.
 - Interpolator: The script offers two interpolation methods. Scipy interpolation method and Pyinterp interpolation method. Only one method can be chosen at a time, depending on user preference.
 
@@ -30,9 +28,9 @@ By default, these variables are assumed to be named:
 - ssh for model_ssh_var
 Users should make sure to provide the correct variable names if their dataset uses different names.
 
-Usage:
+## Usage:
 
-To use the package, the user can clone the repository to a local directory via Git. Once the repository is cloned, the user can run the code in the `Interp_model2SWOT.py` file, by executing the command line from a terminal using the following command (after navigating to the directory containing Interp_model2SWOT.py) :
+To use the tool, the user can clone the repository. Once the repository is cloned, the user can run the code in the `Interp_model2SWOT.py` file, by executing the command line from a terminal using the following command (after navigating to the directory containing Interp_model2SWOT.py) :
 
 ```bash
 ./Interp_model2SWOT.py -m path_to_your_model_file -k path_to_your_model_mask_file -s path_to_swot_data_file -o path_to_output_file -i interpolator --model-lat-var latitude_var_name --model-lon-var longitude_var_name --model-time-var time_name --model_ssh_var the_model_ssh_variable_name
@@ -44,7 +42,7 @@ Where:
 -o is the path to the output directory where results will be saved.
 -i specifies the interpolation method (choose between scipy_interpolation or pyinterp_interpolation).
 
-The user can import the Interp_model2SWOT module into a Python script as follows (refer to the example notebook in the repository for further guidance)
+The user can import the Interp_model2SWOT module into a Python script as follows (refer to the example notebook (In progress...) in the repository for further guidance)
 
 ## ⚡ Notes
 - If the model mask and data are in the same file, you need to provide the path to this file twice — once for the data and once for the mask argument.
