@@ -1,0 +1,27 @@
+[project]
+name = "model2SWOT"
+version = "0.1.0"
+description = "Package to interpolate ocean model data to SWOT swath"
+readme = "README.md"
+requires-python = ">=3.7"
+license = { file = "LICENSE" }
+keywords = ["ocean models", "Swot swath", "Interpolation"]
+authors = [
+  { name = "Amine Ouhechou", email = "amine.ouhechou@univ-grenoble-alpes.fr" },
+  { name = "Micael Habib Aguedjou", email = "HabibMicael.Aguedjou@cnes.fr" },
+  { name = "Julien Le Sommer", email = "julien.lesommer@univ-grenoble-alpes.fr" }
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache-2.0",
+    "Operating System :: OS Independent"
+]
+
+[project.urls]
+Repository = "https://github.com/Amine-ouhechou/synthocean"
+
+
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
