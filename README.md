@@ -2,18 +2,18 @@
 
 **The repository is currently in progress!**  
 
-Description:
+## Description:
 
-Interp_model2SWOT is an approach designed to interpolate model SSH (Sea Surface Height) data onto the SWOT (Surface Water and Ocean Topography) grid. Given a single daily model data, the script interpolates the SSH data onto a given SWOT swath.
+model2SWOT is an approach designed to interpolate model SSH (Sea Surface Height) data onto the SWOT (Surface Water and Ocean Topography) grid. Given a single daily model data, the script interpolates the SSH data onto a given SWOT swath.
 
-Main Requered Inputs:
+### Main Requered Inputs:
 
 - model files containing SSH data.
 - Model mask containing the longitude and latitude coordinates.
 - SWOT data file containing the target longitude/latitude grid. It is recommended to use the "Expert" version of these files.
 - Interpolator: The script offers two interpolation methods. Scipy interpolation method and Pyinterp interpolation method. Only one method can be chosen at a time, depending on user preference.
 
-Other Inputs:
+### Other Inputs:
 
 - latitude_var_name: The name of the latitude variable in the model dataset (e.g., "lat" or "latitude").
 - longitude_var_name: The name of the longitude variable in the model dataset (e.g., "lon" or "longitude").
