@@ -9,7 +9,7 @@ from inpoly.inpoly2 import inpoly2
 
 
 
-def read_netcdf_files(file1, file2, file3, time_name = "time_counter"):
+def read_netcdf_files(file1, file2, file3, time_name = "time_counter", time_step=0):
     """
     Reads three NetCDF files and returns the datasets.
     
@@ -37,7 +37,7 @@ def read_netcdf_files(file1, file2, file3, time_name = "time_counter"):
     ds3 = xr.open_dataset(file3)
 
     # Select first time step if a time dimension exists (SWOT only needs 2D fields)
-    ds1 = ds1.isel({time_name: 0}) if time_name in ds1.dims else ds1  # indeed, if the dataset has time dimension. For the moment only one time step is needed
+    ds1 = ds1.isel({time_name: int(time_step)}) if time_name in ds1.dims else ds1  # indeed, if the dataset has time dimension. For the moment only one time step is needed
     
     return ds1, ds2, ds3
 
@@ -301,7 +301,7 @@ def main():
     # read files
     interpolator = args.interpolator
     print(f"Processing with interpolator: {interpolator}")
-    ds_model, ds_mask, ds_swot = read_netcdf_files(args.model_file, args.mask_file, args.swot_file, args.model_time_var)
+    ds_model, ds_mask, ds_swot = read_netcdf_files(args.model_file, args.mask_file, args.swot_file, args.model_time_var,args.model_timestep_index)
     # Analyse
     finterp = open_model_data(ds_model, ds_mask,interpolator, args.model_ssh_var, ds_swot.latitude, ds_swot.longitude, args.model_lat_var, args.model_lon_var,args.model_timestep_index)
     if finterp !=0: # Checking finterp is not empty
