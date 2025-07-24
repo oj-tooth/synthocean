@@ -287,7 +287,7 @@ def main():
                         help="Name of the time variable in the model NetCDF file (default: time_counter).")
     parser.add_argument("--model_ssh_var", default="ssh", 
                         help="Name of the variable in the model file to interpolate (e.g., 'ssh', 'sossheig', ...)")
-    parser.add_argument("--model_timestep_index", default="ssh", 
+    parser.add_argument("--model_timestep_index", default=0, 
                         help="Time step index in the model file to interpolate (by default is the first time-step)")
     args = parser.parse_args()
 
