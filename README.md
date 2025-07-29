@@ -54,6 +54,9 @@ The data needed for testing will soon be provided via **link**.
 
 The tool will soon be available for installation via pip.
 
+> [!TIP]  
+> This code requires the use of the SWOT dataset, which is provided [here](https://ige-meom-opendap.univ-grenoble-alpes.fr/thredds/catalog/meomopendap/extract/MEOM/SWOT-geometry/catalog.html)
+> 
 ## 🐛 Issues and Contributions
 
 If you encounter any issues or would like to contribute, please feel free to [open an issue here](https://github.com/Amine-ouhechou/synthocean/issues).
