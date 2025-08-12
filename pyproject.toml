@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Package to interpolate ocean model data to SWOT swath"
 readme = "README.md"
 requires-python = ">=3.7"
-license = { file = "LICENSE" }
+license = "Apache-2.0"
 keywords = ["ocean models", "Swot swath", "Interpolation"]
 authors = [
   { name = "Amine Ouhechou", email = "amine.ouhechou@univ-grenoble-alpes.fr" },
@@ -13,15 +13,26 @@ authors = [
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: Apache-2.0",
     "Operating System :: OS Independent"
 ]
+
+dependencies = [
+"xarray",
+"numpy",
+"pyinterp",
+"scipy",
+"inpoly",
+  ]
 
 [project.urls]
 Repository = "https://github.com/Amine-ouhechou/synthocean"
 
-
-
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["model_2SWOT"]
+
+[project.scripts]
+model2swot = "model_2SWOT.model2SWOT:model2swot"
