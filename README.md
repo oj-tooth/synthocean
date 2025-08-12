@@ -37,7 +37,13 @@ To install the **synthocean** package, users should first clone this GitHub repo
 git clone git@github.com:Amine-ouhechou/synthocean.git
 ```
 
-Once users have successfully cloned the repository, the `model2swot` command line interface (CLI) can be installed using pip (editable install) as follows:
+Once users have successfully cloned the repository, users need to install the required dependencies using conda:
+
+```bash
+conda install numpy xarray netcdf4 inpoly scipy pyinterp
+```
+
+Finally, the `model2swot` command line interface (CLI) can be installed using pip (editable install) as follows:
 
 ```bash
 cd synthocean
